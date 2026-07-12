@@ -38,5 +38,5 @@ resolve_bun() {
 
 BUN="$(resolve_bun)" || exit 1
 
-nohup "$BUN" "$(dirname "$0")/title-daemon.ts" >/dev/null 2>&1 &
+nohup "$BUN" "$(dirname "$0")/../src/title-daemon.ts" >/dev/null 2>&1 &
 echo $! >"$PIDFILE"

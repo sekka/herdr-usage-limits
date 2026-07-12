@@ -15,7 +15,7 @@
   "checks": [
     {
       "name": "herdr-pane",
-      "cmd": ["./run.sh"],
+      "cmd": ["./scripts/run.sh"],
       "mode": "render-once",
       "timeout_ms": 4000,
       "expect_present": ["CC5", "CCF"],

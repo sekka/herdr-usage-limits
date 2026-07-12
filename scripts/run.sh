@@ -22,4 +22,4 @@ resolve_bun() {
 }
 
 BUN="$(resolve_bun)" || exit 1
-exec "$BUN" display.ts
+exec "$BUN" "$(dirname "$0")/../src/display.ts"
