@@ -50,13 +50,14 @@ The plugin **ID** is `dotfiles.usage-limits`, which differs from the repository 
 - `display.ts` - the herdr overlay pane. Converts the tmux markup to ANSI, reports a short
   summary to the sidebar agents column, and drives the outer terminal window title.
 - `title-daemon.ts` - a paneless daemon that keeps the outer window title updated.
-- `run.sh`, `ensure-open.sh`, `ensure-title-daemon.sh`, `open-or-focus.sh` - herdr entry and
-  lifecycle helpers (resolve bun, ensure the pane / daemon exist per workspace).
+- `scripts/run.sh`, `scripts/ensure-open.sh`, `scripts/ensure-title-daemon.sh`,
+  `scripts/open-or-focus.sh` - herdr entry and lifecycle helpers (resolve bun, ensure the
+  pane / daemon exist per workspace).
 
 ## Tests
 
 ```sh
-bun test ./engine.test.ts ./display.test.ts
+bun test ./src/engine.test.ts ./src/display.test.ts
 ```
 
 ## Releasing
