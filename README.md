@@ -1,76 +1,114 @@
 # herdr-usage-limits
 
-`sekka/ai-usage-limits@4ad82d3` から herdr プラグイン部分を分離。tmux 版は
-`sekka/tmux-usage-limits`。
-
 Claude Code / Codex usage-limit display for [herdr](https://herdr.dev).
 
-A single source of behavior (`engine.ts`) reads Claude Code and Codex credentials from the
-standard local files or the macOS keychain, caches the usage API responses with `0600`
-permissions, and renders a tmux-formatted status line. The herdr plugin consumes it through
-an overlay pane, an outer-window-title daemon, and a sidebar summary.
+Example output:
+
+```text
+CC5: 61% 1h CCW: 22% 18h40m Fable: 71% 18h40m
+```
+
+## Features
+
+- Shows usage-limit gauges in a herdr overlay pane.
+- Updates the outer terminal window title through a daemon.
+- Reports a short usage summary to herdr sidebar metadata.
+- Reuses the same usage-limit parsing behavior as `tmux-usage-limits`.
 
 ## Requirements
 
-- [bun](https://bun.sh) - the scripts run on bun (`#!/usr/bin/env bun`). Without bun on
-  `PATH` the display is silently empty.
-- macOS - credential lookup falls back to the macOS keychain (`security`).
-- [herdr](https://herdr.dev) `>= 0.7.0`.
-- A logged-in Claude Code and/or Codex CLI (credentials are read from their standard files).
+- [herdr](https://herdr.dev) `>= 0.7.0`
+- [bun](https://bun.sh) on `PATH`
+- macOS for Keychain fallback through `security`
+- A logged-in Claude Code and/or Codex CLI
 
 ## Install
+
+Install the plugin and start the title daemon:
 
 ```sh
 herdr plugin install sekka/herdr-usage-limits
 herdr plugin action invoke start-title-daemon --plugin dotfiles.usage-limits
 ```
 
-Pin to a released version with `--ref` (release tags are `vX.Y.Z`, see
-[Releasing](#releasing)):
+Pin to a released version with `--ref`:
 
 ```sh
 herdr plugin install sekka/herdr-usage-limits --ref v0.1.0
 ```
 
-For local development, link the working copy instead of installing from GitHub:
+For local development, link a working copy:
 
 ```sh
 git clone https://github.com/sekka/herdr-usage-limits
 herdr plugin link ./herdr-usage-limits
 ```
 
-The plugin **ID** is `dotfiles.usage-limits`, which differs from the repository name
-(`herdr-usage-limits`) and is kept stable for compatibility with existing key bindings. Every
-`herdr plugin ... --plugin <id>` command takes the ID, not the repository name.
+The plugin ID is `dotfiles.usage-limits`, which differs from the repository name and is kept stable for existing key bindings. Use the plugin ID with `herdr plugin ... --plugin <id>` commands.
+
+## Usage
+
+Open or focus the usage pane from herdr:
+
+```sh
+herdr plugin action invoke open-or-focus --plugin dotfiles.usage-limits
+```
+
+Start the title daemon again if it is not already running:
+
+```sh
+herdr plugin action invoke start-title-daemon --plugin dotfiles.usage-limits
+```
+
+## Configuration
+
+There are currently no public plugin configuration options. Runtime state is managed by herdr plugin directories and the helper scripts in `scripts/`.
+
+## Security disclosure
+
+- **This plugin reads Claude Code and Codex credentials from their standard local credential files and may fall back to macOS Keychain lookup.**
+- **It sends bearer tokens to Anthropic/OpenAI usage endpoints used by the local CLIs to calculate usage limits.**
+- **Some usage API behavior is not a stable public plugin API; response schema or availability may change.**
+- **The daemon and pane helpers keep local runtime state under herdr-managed plugin directories.**
 
 ## How it works
 
-- `engine.ts` - the shared core: credentials, cache (fresh / stale / expired plus 429
-  backoff), the usage API calls, and the tmux-formatted output.
-- `display.ts` - the herdr overlay pane. Converts the tmux markup to ANSI, reports a short
-  summary to the sidebar agents column, and drives the outer terminal window title.
-- `title-daemon.ts` - a paneless daemon that keeps the outer window title updated.
-- `scripts/run.sh`, `scripts/ensure-open.sh`, `scripts/ensure-title-daemon.sh`,
-  `scripts/open-or-focus.sh` - herdr entry and lifecycle helpers (resolve bun, ensure the
-  pane / daemon exist per workspace).
+`src/engine.ts` handles credentials, cache freshness, usage API calls, stale output, 429 backoff, and tmux-formatted output. `src/display.ts` converts that output for herdr, updates pane/sidebar state, and drives the outer terminal title.
 
-## Tests
+`src/title-daemon.ts` keeps the title updated without an open pane. `scripts/run.sh`, `scripts/ensure-open.sh`, `scripts/ensure-title-daemon.sh`, and `scripts/open-or-focus.sh` are the herdr entry and lifecycle helpers. `scripts/sync-core.sh` is the only cross-repo sync path and copies vendored core from `tmux-usage-limits` into this repo.
+
+## Troubleshooting
+
+- Empty output usually means `bun` is not on `PATH`, credentials are unavailable, or the API request failed before a cache was available.
+- If the title stops updating, invoke `start-title-daemon` again.
+- If the pane does not appear, invoke `open` and confirm the plugin ID is `dotfiles.usage-limits`.
+
+## Development
+
+Run the unit tests:
 
 ```sh
-bun test ./src/engine.test.ts ./src/display.test.ts
+bun test
 ```
 
-## Releasing
+Run the local verification harness:
 
-Releases are automated by [release-please](https://github.com/googleapis/release-please)
-(`.github/workflows/release-please.yml`). The flow is:
+```sh
+./verify/verify.sh
+```
 
-1. Land [Conventional Commits](https://www.conventionalcommits.org) on `master` (`feat:`,
-   `fix:`, `feat!:` for a breaking change).
-2. release-please maintains a "Release PR" that bumps the version in
-   `herdr-plugin.toml` and writes `CHANGELOG.md` from the commit messages.
-3. Merging that PR is the only manual step - it tags `vX.Y.Z` and publishes the GitHub
-   Release automatically.
+Releases are automated by [release-please](https://github.com/googleapis/release-please) through `.github/workflows/release-please.yml`. Land Conventional Commits on `master`; release-please maintains the release PR, changelog, tag, and GitHub Release.
+
+## Uninstall
+
+Stop the daemon and uninstall the plugin:
+
+```sh
+herdr plugin action invoke stop-title-daemon --plugin dotfiles.usage-limits
+herdr plugin uninstall dotfiles.usage-limits
+```
+
+If the daemon was already stopped, uninstalling the plugin is sufficient.
 
 ## License
 
