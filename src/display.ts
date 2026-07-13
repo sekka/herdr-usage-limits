@@ -96,7 +96,6 @@ export function titleText(raw: string): string {
 
 export async function setWindowTitle(raw: string): Promise<void> {
   const title = titleText(raw);
-  if (!title) return;
   const sock = process.env.HERDR_SOCKET_PATH ?? `${homedir()}/.config/herdr/herdr.sock`;
   try {
     const conn = await Bun.connect({
@@ -104,7 +103,7 @@ export async function setWindowTitle(raw: string): Promise<void> {
       socket: { data() {}, error() {} },
     });
     conn.write(
-      `${JSON.stringify({ id: "usage-limits:title", method: "client.window_title.set", params: { title } })}\n`,
+      `${JSON.stringify({ id: "usage-limits:title", method: "client.window_title.set", params: { title: title || null } })}\n`,
     );
     setTimeout(() => conn.end(), 500);
   } catch {
