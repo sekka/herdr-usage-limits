@@ -4,6 +4,7 @@ title: README を公開配布向けテンプレートに統一する
 status: To Do
 assignee: []
 created_date: '2026-07-13 02:21'
+updated_date: '2026-07-13 04:04'
 labels:
   - plugin
   - docs
@@ -57,3 +58,9 @@ ordinal: 1000
 - [ ] #3 全コマンド例のパス・リポジトリ名が実在
 - [ ] #4 ローカルレビューゲート通過
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-13 TASK-85 規約メモ: README は # herdr-usage-limits / Features / Requirements / Install / Usage / Configuration / Security disclosure / How it works / Troubleshooting / Development / Uninstall / License の順に揃える。公開読者向けに個人 home や絶対パスは書かない。credential を扱うため Security disclosure で、読む credential、送信 endpoint、undocumented API リスクを太字で明記する。現状 gap: Usage/Configuration/Security disclosure/Uninstall 不足。sync-core.sh は tmux -> herdr の片方向同期例外として説明してよい。
+<!-- SECTION:NOTES:END -->
