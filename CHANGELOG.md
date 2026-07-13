@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/sekka/herdr-usage-limits/compare/v1.1.0...v1.1.1) (2026-07-13)
+
+
+### Bug Fixes
+
+* percent の % 記号色を gray に揃える ([77ea840](https://github.com/sekka/herdr-usage-limits/commit/77ea840c42113fa7e1db159a8953a573c0c9dc71))
+* tmuxBraille に 0-100 clamp を追加し範囲外入力の crash を防ぐ ([5227cff](https://github.com/sekka/herdr-usage-limits/commit/5227cff21bb249868a7cb4e1390713d5498d10d1))
+* usage-limits core を tmux から同期(同期 fetch 経路ガード) ([e49431b](https://github.com/sekka/herdr-usage-limits/commit/e49431bbe8092904475e3ad71028a2f0c946f319))
+
 ## [1.1.0](https://github.com/sekka/herdr-usage-limits/compare/v1.0.0...v1.1.0) (2026-07-13)
 
 
