@@ -104,6 +104,35 @@ describe("usageMetadataTokens", () => {
     expect(detail?.length).toBeLessThanOrEqual(80);
   });
 
+  test("reset timing の有無が混在しても detail から脱落させない", () => {
+    const raw =
+      "CC5:⣿⣿⣀⣀⣀ 41% (7/6 01:10|2h55m) CCF:⣿⣿⣿⣦⣀ 71% CX5?:⣿⣀⣀⣀⣀ 12% (5m ago)";
+
+    expect(usageMetadataTokens(raw)).toEqual([
+      ["usage", "CC5 41% CCF 71% CX5? 12%"],
+      ["usage_detail", "CC5 41% 2h55m CCF 71% CX5? 12% 5m ago"],
+    ]);
+  });
+
+  test("detail token が 80 文字を超える場合は entry 単位で落とす", () => {
+    const raw =
+      "CC5:⣿⣿⣿⣀⣀ 61% (20:54|1h0m) CCW:⣿⣄⣀⣀⣀ 22% (7/14 14:34|18h40m) CCF:⣿⣿⣿⣦⣀ 71% (7/14 01:06|5h12m) CX5:⣿⣿⣀⣀⣀ 44% (7/14 21:00|9h30m) CXW:⣿⣀⣀⣀⣀ 15% (7/16|2d3h) CXR:⣿⣿⣿⣿⣷ 99% (7/30|12d3h)";
+
+    const detail = usageMetadataTokens(raw).find(([name]) => name === "usage_detail")?.[1];
+
+    expect(detail).toBe("CC5 61% 1h0m CCW 22% 18h40m CCF 71% 5h12m CX5 44% 9h30m CXW 15% 2d3h");
+    expect(detail?.length).toBeLessThanOrEqual(80);
+  });
+
+  test("単一 entry が 80 文字を超える場合は省略目印を付けて切る", () => {
+    const raw = `LONGWINDOW:⣿⣿⣿⣿⣿ 99% (${"2026-07-20T16:00:00+09:00 ".repeat(3)})`;
+
+    const detail = usageMetadataTokens(raw).find(([name]) => name === "usage_detail")?.[1];
+
+    expect(detail).toHaveLength(80);
+    expect(detail?.endsWith("...")).toBe(true);
+  });
+
   test("空の status では token を返さない", () => {
     expect(usageMetadataTokens("no limits here")).toEqual([]);
   });

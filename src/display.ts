@@ -51,7 +51,8 @@ export function shortStatus(raw: string): string {
 }
 
 function compactDetail(raw: string, maxLength = 80): string {
-  const entries = [...titleText(raw).matchAll(/([A-Za-z]+\d*\??): (\d+%) \(([^)]*)\)/g)].map((m) => {
+  const entries = [...titleText(raw).matchAll(/([A-Za-z]+\d*\??): (\d+%)(?: \(([^)]*)\))?/g)].map((m) => {
+    if (!m[3]) return `${m[1]} ${m[2]}`;
     const timing = m[3].includes("|") ? m[3].split("|").at(-1) : m[3];
     return `${m[1]} ${m[2]} ${timing}`;
   });
@@ -63,7 +64,7 @@ function compactDetail(raw: string, maxLength = 80): string {
     if (next.length > maxLength) break;
     kept.push(entry);
   }
-  return kept.length > 0 ? kept.join(" ") : detail.slice(0, maxLength);
+  return kept.length > 0 ? kept.join(" ") : `${detail.slice(0, maxLength - 3)}...`;
 }
 
 export function usageMetadataTokens(raw: string): [string, string][] {
