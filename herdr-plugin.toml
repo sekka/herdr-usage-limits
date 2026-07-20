@@ -1,6 +1,6 @@
 id = "dotfiles.usage-limits"
 name = "Usage Limits"
-version = "1.1.1"
+version = "1.2.0"
 min_herdr_version = "0.7.4"
 description = "CC/Codex rate-limit window title display"
 platforms = ["macos"]
