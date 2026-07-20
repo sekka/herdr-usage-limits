@@ -122,13 +122,11 @@ function setupFixtureHome(manifest: Manifest): string {
 
 // Child env: isolate HOME to the fixture, and scrub herdr session variables
 // so a check run from inside a live herdr session cannot mutate the real
-// session (sidebar status report, outer window title) as a side effect of
-// verification. This matters because HERDR_PANE_ID/HERDR_SOCKET_PATH are
-// ambient env vars, not something the fixture HOME can shadow.
+// session (outer window title) as a side effect of verification. HERDR_SOCKET_PATH
+// is an ambient env var, not something the fixture HOME can shadow.
 function buildChildEnv(fixtureHome: string): Record<string, string> {
   const env: Record<string, string> = { ...(process.env as Record<string, string>) };
   env.HOME = fixtureHome;
-  delete env.HERDR_PANE_ID;
   delete env.HERDR_BIN_PATH;
   env.HERDR_SOCKET_PATH = path.join(fixtureHome, "herdr-verify-unreachable.sock");
   return env;
