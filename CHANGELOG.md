@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/sekka/herdr-usage-limits/compare/v1.1.1...v1.2.0) (2026-07-20)
+
+
+### Features
+
+* サイドバーに usage metadata token を報告する ([ebc11aa](https://github.com/sekka/herdr-usage-limits/commit/ebc11aa9ff5e0fd56773ab71242aa60670867b3e))
+
+
+### Bug Fixes
+
+* tmux canonical の cache 読み込みバリデーションをコピー同期で受領する (M1) ([a21fe17](https://github.com/sekka/herdr-usage-limits/commit/a21fe174e8fdef6022eef90334566cce1d9f163d))
+* tmux の cache 読み込みバリデーションを同期する ([519ec39](https://github.com/sekka/herdr-usage-limits/commit/519ec39dc1ded6413fb85b5a517a7b614268827c))
+* usage detail token の欠落と省略を直す ([0c3a688](https://github.com/sekka/herdr-usage-limits/commit/0c3a68847dc1edd4eb58b6733a24b8a0ad08b01a))
+
 ## [1.1.1](https://github.com/sekka/herdr-usage-limits/compare/v1.1.0...v1.1.1) (2026-07-13)
 
 
