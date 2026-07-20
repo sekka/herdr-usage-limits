@@ -28,7 +28,7 @@ Install the plugin. New workspaces start the title daemon automatically; run the
 
 ```sh
 herdr plugin install sekka/herdr-usage-limits
-herdr plugin action invoke start-title-daemon --plugin dotfiles.usage-limits
+herdr plugin action invoke start-title-daemon --plugin sekka.usage-limits
 ```
 
 Pin to a released version with `--ref`:
@@ -44,14 +44,14 @@ git clone https://github.com/sekka/herdr-usage-limits
 herdr plugin link ./herdr-usage-limits
 ```
 
-The plugin ID is `dotfiles.usage-limits`, which differs from the repository name and is kept stable for existing key bindings. Use the plugin ID with `herdr plugin ... --plugin <id>` commands.
+The plugin ID is `sekka.usage-limits`. Use the plugin ID with `herdr plugin ... --plugin <id>` commands.
 
 ## Usage
 
 Start the title daemon again if it is not already running:
 
 ```sh
-herdr plugin action invoke start-title-daemon --plugin dotfiles.usage-limits
+herdr plugin action invoke start-title-daemon --plugin sekka.usage-limits
 ```
 
 ## Configuration
@@ -97,8 +97,8 @@ Releases are automated by [release-please](https://github.com/googleapis/release
 Stop the daemon and uninstall the plugin:
 
 ```sh
-herdr plugin action invoke stop-title-daemon --plugin dotfiles.usage-limits
-herdr plugin uninstall dotfiles.usage-limits
+herdr plugin action invoke stop-title-daemon --plugin sekka.usage-limits
+herdr plugin uninstall sekka.usage-limits
 ```
 
 If the daemon was already stopped, uninstalling the plugin is sufficient.
