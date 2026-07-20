@@ -1,6 +1,6 @@
 # herdr-usage-limits
 
-Claude Code / Codex usage-limit display for [herdr](https://herdr.dev).
+Claude Code / Codex usage-limit window-title display for [herdr](https://herdr.dev).
 
 Example output:
 
@@ -12,9 +12,7 @@ Gauge = utilization. `(reset time|time remaining)` shows the reset point and rem
 
 ## Features
 
-- Shows usage-limit gauges in a herdr overlay pane.
 - Updates the outer terminal window title through a daemon.
-- Reports structured `usage` and `usage_detail` tokens to herdr sidebar metadata.
 - Reuses the same usage-limit parsing behavior as `tmux-usage-limits`.
 
 ## Requirements
@@ -26,7 +24,7 @@ Gauge = utilization. `(reset time|time remaining)` shows the reset point and rem
 
 ## Install
 
-Install the plugin and start the title daemon:
+Install the plugin. New workspaces start the title daemon automatically; run the action once for an already-open session:
 
 ```sh
 herdr plugin install sekka/herdr-usage-limits
@@ -50,12 +48,6 @@ The plugin ID is `dotfiles.usage-limits`, which differs from the repository name
 
 ## Usage
 
-Open or focus the usage pane from herdr:
-
-```sh
-herdr plugin action invoke open-or-focus --plugin dotfiles.usage-limits
-```
-
 Start the title daemon again if it is not already running:
 
 ```sh
@@ -66,37 +58,23 @@ herdr plugin action invoke start-title-daemon --plugin dotfiles.usage-limits
 
 There are currently no public plugin configuration options. Runtime state is managed by herdr plugin directories and the helper scripts in `scripts/`.
 
-To show usage metadata in the expanded desktop sidebar, add the plugin tokens to your Herdr agent row layout:
-
-```toml
-[ui.sidebar.agents]
-rows = [
-  ["state_icon", "workspace", "tab"],
-  ["agent", "$usage"],
-  ["$usage_detail"],
-]
-```
-
-`$usage` is the compact form, such as `CC5 41% CCW 36%`. `$usage_detail` keeps compact reset timing, such as `CC5 41% 2h55m CCW 36% 7h45m`, and stays within Herdr's 80-character token limit.
-
 ## Security disclosure
 
 - **This plugin reads Claude Code and Codex credentials from their standard local credential files and may fall back to macOS Keychain lookup.**
 - **It sends bearer tokens to Anthropic/OpenAI usage endpoints used by the local CLIs to calculate usage limits.**
 - **Some usage API behavior is not a stable public plugin API; response schema or availability may change.**
-- **The daemon and pane helpers keep local runtime state under herdr-managed plugin directories.**
+- **The title daemon keeps local runtime state under herdr-managed plugin directories.**
 
 ## How it works
 
-`src/engine.ts` handles credentials, cache freshness, usage API calls, stale output, 429 backoff, and tmux-formatted output. `src/display.ts` converts that output for herdr, updates pane/sidebar state, and drives the outer terminal title.
+`src/engine.ts` handles credentials, cache freshness, usage API calls, stale output, 429 backoff, and tmux-formatted output. `src/display.ts` converts that output for the outer terminal title and writes it to herdr's socket API.
 
-`src/title-daemon.ts` keeps the title updated without an open pane. `scripts/run.sh`, `scripts/ensure-open.sh`, `scripts/ensure-title-daemon.sh`, and `scripts/open-or-focus.sh` are the herdr entry and lifecycle helpers. `scripts/sync-core.sh` is the only cross-repo sync path and copies vendored core from `tmux-usage-limits` into this repo.
+`src/title-daemon.ts` keeps the title updated without an open pane. `scripts/ensure-title-daemon.sh` is the herdr lifecycle helper. `scripts/sync-core.sh` is the only cross-repo sync path and copies vendored core from `tmux-usage-limits` into this repo.
 
 ## Troubleshooting
 
 - Empty output usually means `bun` is not on `PATH`, credentials are unavailable, or the API request failed before a cache was available.
 - If the title stops updating, invoke `start-title-daemon` again.
-- If the pane does not appear, invoke `open` and confirm the plugin ID is `dotfiles.usage-limits`.
 
 ## Development
 

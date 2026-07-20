@@ -14,13 +14,15 @@
   ],
   "checks": [
     {
-      "name": "herdr-pane",
-      "cmd": ["./scripts/run.sh"],
-      "mode": "render-once",
-      "timeout_ms": 4000,
+      "name": "window-title-text",
+      "cmd": [
+        "bun",
+        "-e",
+        "import { getUsageStatus } from './src/engine.ts'; import { titleText } from './src/display.ts'; console.log(titleText((await getUsageStatus()).trim()));"
+      ],
+      "mode": "oneshot",
       "expect_present": ["CC5", "CCF"],
-      "expect_absent": ["CCS"],
-      "best_effort": true
+      "expect_absent": ["CCS"]
     }
   ]
 }

@@ -2,19 +2,8 @@ id = "dotfiles.usage-limits"
 name = "Usage Limits"
 version = "1.1.1"
 min_herdr_version = "0.7.4"
-description = "CC/Codex rate-limit overlay (tmux status-right parity)"
+description = "CC/Codex rate-limit window title display"
 platforms = ["macos"]
-
-[[panes]]
-id = "limits"
-title = "CC / Codex Usage Limits"
-placement = "overlay"
-command = ["./scripts/run.sh"]
-
-# サイドバー常時表示の自動起動: workspace 作成のたびに limits pane の存在を保証
-[[events]]
-on = "workspace.created"
-command = ["./scripts/ensure-open.sh"]
 
 # ウィンドウタイトル書き込み用 paneless デーモンの自動起動
 # 既存セッションには workspace.created が飛ばないため、初回は
@@ -22,11 +11,6 @@ command = ["./scripts/ensure-open.sh"]
 [[events]]
 on = "workspace.created"
 command = ["./scripts/ensure-title-daemon.sh"]
-
-[[actions]]
-id = "open-or-focus"
-title = "Open or focus usage limits"
-command = ["./scripts/open-or-focus.sh"]
 
 [[actions]]
 id = "start-title-daemon"
