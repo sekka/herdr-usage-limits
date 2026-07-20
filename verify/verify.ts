@@ -127,7 +127,6 @@ function setupFixtureHome(manifest: Manifest): string {
 function buildChildEnv(fixtureHome: string): Record<string, string> {
   const env: Record<string, string> = { ...(process.env as Record<string, string>) };
   env.HOME = fixtureHome;
-  delete env.HERDR_PANE_ID;
   delete env.HERDR_BIN_PATH;
   env.HERDR_SOCKET_PATH = path.join(fixtureHome, "herdr-verify-unreachable.sock");
   return env;
