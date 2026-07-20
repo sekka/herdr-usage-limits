@@ -14,12 +14,12 @@ Gauge = utilization. `(reset time|time remaining)` shows the reset point and rem
 
 - Shows usage-limit gauges in a herdr overlay pane.
 - Updates the outer terminal window title through a daemon.
-- Reports a short usage summary to herdr sidebar metadata.
+- Reports structured `usage` and `usage_detail` tokens to herdr sidebar metadata.
 - Reuses the same usage-limit parsing behavior as `tmux-usage-limits`.
 
 ## Requirements
 
-- [herdr](https://herdr.dev) `>= 0.7.0`
+- [herdr](https://herdr.dev) `>= 0.7.4`
 - [bun](https://bun.sh) on `PATH`
 - macOS for Keychain fallback through `security`
 - A logged-in Claude Code and/or Codex CLI
@@ -65,6 +65,19 @@ herdr plugin action invoke start-title-daemon --plugin dotfiles.usage-limits
 ## Configuration
 
 There are currently no public plugin configuration options. Runtime state is managed by herdr plugin directories and the helper scripts in `scripts/`.
+
+To show usage metadata in the expanded desktop sidebar, add the plugin tokens to your Herdr agent row layout:
+
+```toml
+[ui.sidebar.agents]
+rows = [
+  ["state_icon", "workspace", "tab"],
+  ["agent", "$usage"],
+  ["$usage_detail"],
+]
+```
+
+`$usage` is the compact form, such as `CC5 41% CCW 36%`. `$usage_detail` keeps compact reset timing, such as `CC5 41% 2h55m CCW 36% 7h45m`, and stays within Herdr's 80-character token limit.
 
 ## Security disclosure
 

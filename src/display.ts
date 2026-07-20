@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // herdr plugin pane: CC/Codex のレート制限を表示する。
 // データ取得・キャッシュは engine.ts (tmux status-right と同一実装) に委譲し、
-// ここでは (1) tmux 書式→ANSI 変換して pane に描画、(2) 短縮サマリを
-// pane report-agent の custom_status としてサイドバー agents 欄へ常時表示、の2つを行う。
+// ここでは (1) tmux 書式→ANSI 変換して pane に描画、(2) usage metadata token を
+// サイドバー agents 欄へ報告、の2つを行う。
 import { homedir } from "os";
 import { getUsageStatus } from "./engine.ts";
 
@@ -50,19 +50,37 @@ export function shortStatus(raw: string): string {
   return pairs.map((m) => `${m[1]} ${m[2]}`).join(" ");
 }
 
-export async function fetchRaw(): Promise<string> {
-  return (await getUsageStatus()).trim();
+function compactDetail(raw: string, maxLength = 80): string {
+  const entries = [...titleText(raw).matchAll(/([A-Za-z]+\d*\??): (\d+%)(?: \(([^)]*)\))?/g)].map((m) => {
+    if (!m[3]) return `${m[1]} ${m[2]}`;
+    const timing = m[3].includes("|") ? m[3].split("|").at(-1) : m[3];
+    return `${m[1]} ${m[2]} ${timing}`;
+  });
+  const detail = entries.length > 0 ? entries.join(" ") : titleText(raw);
+  if (detail.length <= maxLength) return detail;
+  const kept: string[] = [];
+  for (const entry of entries) {
+    const next = [...kept, entry].join(" ");
+    if (next.length > maxLength) break;
+    kept.push(entry);
+  }
+  return kept.length > 0 ? kept.join(" ") : `${detail.slice(0, maxLength - 3)}...`;
 }
 
-function reportToSidebar(raw: string): void {
-  const paneId = process.env.HERDR_PANE_ID;
-  if (!paneId) return;
-  const status = shortStatus(raw);
-  if (!status) return;
-  const herdr = process.env.HERDR_BIN_PATH ?? "herdr";
-  Bun.spawn(
+export function usageMetadataTokens(raw: string): [string, string][] {
+  const usage = shortStatus(raw);
+  if (!usage) return [];
+  return [
+    ["usage", usage],
+    ["usage_detail", compactDetail(raw)],
+  ];
+}
+
+export function sidebarReportCommands(raw: string, paneId: string): string[][] {
+  const tokens = usageMetadataTokens(raw);
+  if (tokens.length === 0) return [];
+  return [
     [
-      herdr,
       "pane",
       "report-agent",
       paneId,
@@ -72,11 +90,33 @@ function reportToSidebar(raw: string): void {
       "limits",
       "--state",
       "idle",
-      "--custom-status",
-      status,
+      "--message",
+      "usage limits",
     ],
-    { stdout: "ignore", stderr: "ignore" },
-  );
+    [
+      "pane",
+      "report-metadata",
+      paneId,
+      "--source",
+      "plugin:usage-limits",
+      ...tokens.flatMap(([name, value]) => ["--token", `${name}=${value}`]),
+      "--ttl-ms",
+      String(REFRESH_MS * 3),
+    ],
+  ];
+}
+
+export async function fetchRaw(): Promise<string> {
+  return (await getUsageStatus()).trim();
+}
+
+function reportToSidebar(raw: string): void {
+  const paneId = process.env.HERDR_PANE_ID;
+  if (!paneId) return;
+  const herdr = process.env.HERDR_BIN_PATH ?? "herdr";
+  for (const args of sidebarReportCommands(raw, paneId)) {
+    Bun.spawn([herdr, ...args], { stdout: "ignore", stderr: "ignore" });
+  }
 }
 
 // 外側ターミナルのウィンドウタイトルに tmux 表示のテキスト版を常時表示する。
