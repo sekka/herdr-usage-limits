@@ -1,5 +1,5 @@
 {
-  "plugin_id": "dotfiles.usage-limits",
+  "plugin_id": "sekka.usage-limits",
   "fixtures": [
     {
       "home_path": ".claude/data/herdr-usage-limits-cache.json",

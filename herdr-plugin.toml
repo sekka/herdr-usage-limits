@@ -1,4 +1,4 @@
-id = "dotfiles.usage-limits"
+id = "sekka.usage-limits"
 name = "Usage Limits"
 version = "1.1.1"
 min_herdr_version = "0.7.4"
@@ -7,7 +7,7 @@ platforms = ["macos"]
 
 # ウィンドウタイトル書き込み用 paneless デーモンの自動起動
 # 既存セッションには workspace.created が飛ばないため、初回は
-# `herdr plugin action invoke start-title-daemon --plugin dotfiles.usage-limits` で手動起動する
+# `herdr plugin action invoke start-title-daemon --plugin sekka.usage-limits` で手動起動する
 [[events]]
 on = "workspace.created"
 command = ["./scripts/ensure-title-daemon.sh"]
