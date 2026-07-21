@@ -8,6 +8,7 @@ INSTALL_STAMP="$REPO_ROOT/node_modules/.install-stamp"
 INSTALL_LOCK_DIR="$REPO_ROOT/node_modules/.install-lock"
 INSTALL_LOCK_PID_FILE="$INSTALL_LOCK_DIR/pid"
 INSTALL_LOCK_STALE_SECONDS=120
+INSTALL_WAIT_SECONDS=30
 
 if [ "${1:-}" = "stop" ]; then
   [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
@@ -123,7 +124,8 @@ ensure_dependencies() {
   fi
 
   if ! acquire_install_lock; then
-    return 1
+    wait_for_dependencies "$lock_checksum"
+    return $?
   fi
 
   if dependencies_are_current "$lock_checksum"; then
@@ -132,7 +134,10 @@ ensure_dependencies() {
   fi
 
   if "$BUN" install --cwd "$REPO_ROOT" --frozen-lockfile --silent >/dev/null 2>&1; then
-    printf '%s\n' "$lock_checksum" >"$INSTALL_STAMP"
+    if ! printf '%s\n' "$lock_checksum" >"$INSTALL_STAMP"; then
+      release_install_lock
+      return 1
+    fi
     release_install_lock
     return 0
   fi
@@ -141,8 +146,25 @@ ensure_dependencies() {
   return 1
 }
 
+wait_for_dependencies() {
+  expected="$1"
+  waited=0
+  while [ "$waited" -lt "$INSTALL_WAIT_SECONDS" ]; do
+    sleep 1
+    waited=$((waited + 1))
+    if dependencies_are_current "$expected"; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 BUN="$(resolve_bun)" || exit 1
-ensure_dependencies || exit 0
+if ! ensure_dependencies; then
+  echo "usage-limits dependency install failed" >&2
+  exit 1
+fi
 
 nohup "$BUN" "$REPO_ROOT/src/title-daemon.ts" >/dev/null 2>&1 &
 echo $! >"$PIDFILE"
