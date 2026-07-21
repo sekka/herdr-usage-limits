@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/sekka/herdr-usage-limits/compare/v1.2.0...v1.2.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* dependency guard の失敗処理と待機を修正 ([d90cee7](https://github.com/sekka/herdr-usage-limits/commit/d90cee715e2fc5712d11260e4a65c341f48c8970))
+
 ## [1.2.0](https://github.com/sekka/herdr-usage-limits/compare/v1.1.1...v1.2.0) (2026-07-20)
 
 
