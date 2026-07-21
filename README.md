@@ -67,9 +67,9 @@ There are currently no public plugin configuration options. Runtime state is man
 
 ## How it works
 
-`src/engine.ts` handles credentials, cache freshness, usage API calls, stale output, 429 backoff, and tmux-formatted output. `src/display.ts` converts that output for the outer terminal title and writes it to herdr's socket API.
+`src/engine.ts` handles tmux-formatted output and herdr-specific cache paths. Shared credential, usage API, cache, stale output, 429 backoff, and stampede-lock behavior comes from the `usage-limits-core` package. `src/display.ts` converts the output for the outer terminal title and writes it to herdr's socket API.
 
-`src/title-daemon.ts` keeps the title updated without an open pane. `scripts/ensure-title-daemon.sh` is the herdr lifecycle helper. `scripts/sync-core.sh` is the only cross-repo sync path and copies vendored core from `tmux-usage-limits` into this repo.
+`src/title-daemon.ts` keeps the title updated without an open pane. `scripts/ensure-title-daemon.sh` is the herdr lifecycle helper and restores package dependencies on first run when a plugin install has no `node_modules` yet.
 
 ## Troubleshooting
 
