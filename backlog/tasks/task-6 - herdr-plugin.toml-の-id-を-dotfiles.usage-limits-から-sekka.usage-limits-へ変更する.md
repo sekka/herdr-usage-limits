@@ -3,8 +3,8 @@ id: TASK-6
 title: herdr-plugin.toml の id を dotfiles.usage-limits から sekka.usage-limits へ変更する
 status: Done
 assignee: []
-created_date: '2026-07-20 10:35'
-updated_date: '2026-07-20 21:40'
+created_date: "2026-07-20 10:35"
+updated_date: "2026-07-20 21:40"
 labels:
   - refactor
 dependencies: []
@@ -28,7 +28,10 @@ ordinal: 6000
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
+
 <!-- AC:BEGIN -->
-- [x] #1 herdr-plugin.toml の id が sekka.usage-limits になり、自 id 参照が残っていない (grep 0 hit)
+
+- [x] #1 herdr-plugin.toml の id が sekka.usage-limits になり、自 id 参照が残っていない — grep 範囲は backlog/ (経緯記録として旧 id を含む) を除く追跡ファイル全体: `git grep -l 'dotfiles\.usage-limits' -- ':!backlog'` で 0 hit。実装コミット 9f45504 (PR #6)
 - [x] #2 herdr 上で旧 id uninstall → 新 id 登録済みで動作確認している (cc-statusline TASK-9 AC#3 の本リポ分)
+
 <!-- AC:END -->

@@ -3,8 +3,8 @@ id: TASK-4
 title: usage-limits-core を共有パッケージリポ参照に切り替える
 status: Done
 assignee: []
-created_date: '2026-07-20 10:00'
-updated_date: '2026-07-21 23:35'
+created_date: "2026-07-20 10:00"
+updated_date: "2026-07-21 23:35"
 labels:
   - refactor
 dependencies: []
@@ -34,8 +34,17 @@ ordinal: 4000
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
+
 <!-- AC:BEGIN -->
+
 - [x] #1 src/usage-limits-core.ts が削除され、タグ pin の git dependency 参照になっている
 - [x] #2 bun test が全パスし、herdr title 表示の実挙動が変わらないことを確認している
 - [x] #3 scripts/sync-core.sh が削除され、README の sync 記述も更新されている
+
 <!-- AC:END -->
+
+## 実施記録 (2026-07-21)
+
+- 実装: PR #7 `refactor/use-core-package` (3c9f7ef 依存追加 → 5b35460 package 参照切替 → d90cee7 guard 修正)、merge 1a025e4。v1.2.1 (tag) としてリリース
+- AC#2 証跡: PR #7 の CI (bun test) 全パス。herdr title の実挙動は sekka.usage-limits@2eb38c6 (=v1.2.1) の daemon 稼働で確認 — 検証記録は cc-statusline-usage-limits TASK-9 AC#5 (2026-07-22)
+- AC#3 証跡: sync-core.sh 削除と README の sync 記述更新は 5b35460 の diff に含まれる
