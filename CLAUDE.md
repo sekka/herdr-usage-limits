@@ -11,7 +11,9 @@ Before declaring any change ready, run BOTH reviews on the feature branch and ad
 
 1. **Codex peer review** via agmsg — an independent peer read of the diff.
 2. **CodeRabbit CLI** — `coderabbit review --base master` (add `--agent` for structured,
-   agent-consumable findings; `--type all` covers committed + staged + unstaged).
+   agent-consumable findings; `--include-untracked` also reviews untracked files).
+   CodeRabbit CLI silently ignores unknown flags and exits 0, so verify changed gate flags with
+   `coderabbit review --help`.
 
 If either reviewer is unavailable (rate limit), fall back to an independent **`reviewer-judgment`
 (Opus)** review so the "independent second read" property is preserved. Do NOT skip the gate.
