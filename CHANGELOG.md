@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/sekka/herdr-usage-limits/compare/v1.2.1...v1.2.2) (2026-07-27)
+
+
+### Bug Fixes
+
+* bun 解決を候補リスト化して環境非依存にする ([febe28d](https://github.com/sekka/herdr-usage-limits/commit/febe28dacf9dca97836d0d80946799a0a969600f))
+
 ## [1.2.1](https://github.com/sekka/herdr-usage-limits/compare/v1.2.0...v1.2.1) (2026-07-21)
 
 
