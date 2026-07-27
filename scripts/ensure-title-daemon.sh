@@ -268,7 +268,7 @@ install_lock_is_stale() {
   *)
     kill_error="$(LC_ALL=C kill -0 "$lock_pid" 2>&1)" && return 1
     case "$kill_error" in
-    *"Operation not permitted"* | *"not permitted"*) return 1 ;;
+    *"not permitted"*) return 1 ;;
     *) return 0 ;;
     esac
     ;;
