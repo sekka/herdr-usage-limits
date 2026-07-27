@@ -12,9 +12,9 @@ Before declaring any change ready, run BOTH reviews on the feature branch and ad
 1. **Codex peer review** via agmsg — an independent peer read of the diff.
 2. **CodeRabbit CLI** — `coderabbit review --base master` (add `--agent` for structured,
    agent-consumable findings; `--include-untracked` also reviews untracked files).
-   Flags get renamed or hidden between CLI releases and `--help` does not list hidden flags, so
-   re-check `coderabbit review --help` before changing this command — and treat `--help` alone as
-   insufficient: probe the flag with a deliberately invalid value and read the error
+   `--help` does not list every accepted flag, so re-check `coderabbit review --help` before
+   changing this command — and treat `--help` alone as insufficient: probe the flag with a
+   deliberately invalid value and read the error
    (`coderabbit review --type bogus` prints the valid types, proving `--type` is still accepted
    even though `--help` omits it).
 
