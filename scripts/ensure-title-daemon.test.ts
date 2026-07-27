@@ -36,7 +36,7 @@ function fixture(options: { ignoreTerm?: boolean } = {}) {
   const onTerm = options.ignoreTerm ? "$SIG{'TERM'} = 'IGNORE';\n" : "";
   writeFileSync(
     command,
-    `#!/usr/bin/perl\n${onTerm}open my $starts, ">>", $ENV{STARTS_FILE} or die $!;\nprint $starts "started\\n";\nclose $starts;\nwhile (1) { sleep 1; }\n`,
+    `#!/usr/bin/perl\n${onTerm}open my $starts, ">>", $ENV{STARTS_FILE} or die $!;\nprint $starts "$$\\n";\nclose $starts;\nwhile (1) { sleep 1; }\n`,
   );
   chmodSync(command, 0o755);
   return {
@@ -137,5 +137,27 @@ describe("ensure-title-daemon.sh", () => {
     expect(processIsAlive(pid)).toBe(true);
     expect(readFileSync(join(f.stateDir, "title-daemon.pid"), "utf8").trim()).toBe(`${pid}`);
     expect(stopped.stderr.toString()).toContain("daemon did not stop");
+  });
+
+  test("ready 判定に失敗した daemon は終了を確認してから pidfile を消す", async () => {
+    // PROCESS_MATCH を意図的に外して「起動済みだが ready と判定されない」状態を作る。
+    // ここで終了確認前に pidfile を消すと、次の start が別 daemon を起こして多重起動する
+    const f = fixture({ ignoreTerm: true });
+    const env = {
+      ...f.env,
+      ENSURE_TITLE_DAEMON_PROCESS_MATCH: "definitely-not-present",
+      ENSURE_TITLE_DAEMON_READY_WAIT_SECONDS: "1",
+      ENSURE_TITLE_DAEMON_STOP_WAIT_SECONDS: "1",
+    };
+
+    const started = run(env);
+
+    expect(started.exitCode).not.toBe(0);
+    expect(started.stderr.toString()).toContain("did not become ready");
+    expect(existsSync(f.starts)).toBe(true);
+    const pid = Number(readFileSync(f.starts, "utf8").trim().split("\n")[0]);
+    processes.add(pid);
+    expect(processIsAlive(pid)).toBe(false);
+    expect(existsSync(join(f.stateDir, "title-daemon.pid"))).toBe(false);
   });
 });

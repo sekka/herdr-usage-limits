@@ -144,6 +144,33 @@ wait_for_daemon_ready() {
   done
 }
 
+# ready 判定に失敗した子の後始末。終了を確認せずに pidfile を消すと、次の start が
+# pidfile 不在を理由に別 daemon を起こし、多重起動ガードを failure path から破られる。
+# 自分が起こした子なので TERM 後は SIGKILL まで escalate して終了を確定させる。
+terminate_child() {
+  child_pid="$1"
+  kill "$child_pid" 2>/dev/null || true
+  if wait_for_exit "$child_pid"; then
+    return 0
+  fi
+
+  kill -KILL "$child_pid" 2>/dev/null || true
+  wait_for_exit "$child_pid"
+}
+
+wait_for_exit() {
+  exit_pid="$1"
+  waited=0
+  while [ "$waited" -lt "$STOP_WAIT_SECONDS" ]; do
+    if ! is_process_running "$exit_pid"; then
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  return 1
+}
+
 stop_daemon() {
   daemon_pid="$(read_daemon_pid)" || {
     rm -f "$PIDFILE"
@@ -158,15 +185,10 @@ stop_daemon() {
     return 1
   fi
 
-  waited=0
-  while [ "$waited" -lt "$STOP_WAIT_SECONDS" ]; do
-    if ! is_process_running "$daemon_pid"; then
-      rm -f "$PIDFILE"
-      return 0
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
+  if wait_for_exit "$daemon_pid"; then
+    rm -f "$PIDFILE"
+    return 0
+  fi
 
   echo "daemon did not stop" >&2
   return 1
@@ -380,7 +402,10 @@ if ! printf '%s\n' "$daemon_pid" >"$PIDFILE"; then
 fi
 
 if ! wait_for_daemon_ready "$daemon_pid"; then
-  kill "$daemon_pid" 2>/dev/null || true
+  if ! terminate_child "$daemon_pid"; then
+    echo "daemon did not become ready and could not be terminated" >&2
+    exit 1
+  fi
   rm -f "$PIDFILE"
   echo "daemon did not become ready" >&2
   exit 1
