@@ -112,11 +112,12 @@ describe("ensure-title-daemon.sh", () => {
     const f = fixture();
     expect(run(f.env).exitCode).toBe(0);
     const pid = trackedPid(f.stateDir);
-    await waitUntil(() => processIsAlive(pid));
+    await waitUntil(() => existsSync(f.starts));
 
     const stopped = run(f.env, "stop");
 
     expect(stopped.exitCode).toBe(0);
+    await waitUntil(() => !processIsAlive(pid));
     expect(existsSync(join(f.stateDir, "title-daemon.pid"))).toBe(false);
   });
 
@@ -131,9 +132,10 @@ describe("ensure-title-daemon.sh", () => {
 
     const stopped = run(f.env, "stop");
 
-    expect(stopped.stderr.toString()).toContain("daemon did not stop");
+    // pidfile 保持と非ゼロ終了が本質。stderr 文言は補助的な確認として最後に置く
     expect(stopped.exitCode).not.toBe(0);
     expect(processIsAlive(pid)).toBe(true);
     expect(readFileSync(join(f.stateDir, "title-daemon.pid"), "utf8").trim()).toBe(`${pid}`);
+    expect(stopped.stderr.toString()).toContain("daemon did not stop");
   });
 });

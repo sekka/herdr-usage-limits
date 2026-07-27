@@ -7,6 +7,7 @@ LOCK_PID_FILE="$LOCK_DIR/pid"
 LOCK_STALE_SECONDS="${ENSURE_TITLE_DAEMON_LOCK_STALE_SECONDS:-30}"
 LOCK_WAIT_SECONDS="${ENSURE_TITLE_DAEMON_LOCK_WAIT_SECONDS:-5}"
 STOP_WAIT_SECONDS="${ENSURE_TITLE_DAEMON_STOP_WAIT_SECONDS:-5}"
+READY_WAIT_SECONDS="${ENSURE_TITLE_DAEMON_READY_WAIT_SECONDS:-5}"
 PROCESS_MATCH="${ENSURE_TITLE_DAEMON_PROCESS_MATCH:-title-daemon.ts}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -31,14 +32,39 @@ lock_is_stale() {
   '' | *[!0-9]*)
     ;;
   *)
-    kill -0 "$lock_pid" 2>/dev/null && return 1
-    return 0
+    kill_error="$(kill -0 "$lock_pid" 2>&1)" && return 1
+    case "$kill_error" in
+    # 別ユーザーの PID だと生死を判定できない。install lock と違い daemon lock には
+    # wait_for_dependencies のような時間切れの逃げ道が無く、ここで「生存」と即断すると
+    # 恒久的に start 不能になる。mtime 判定へ落として時間で回収する。
+    *"not permitted"*) ;;
+    *) return 0 ;;
+    esac
     ;;
   esac
 
   lock_mtime="$(stat -f %m "$LOCK_DIR" 2>/dev/null)" || return 1
   now="$(date +%s)" || return 1
   [ $((now - lock_mtime)) -ge "$LOCK_STALE_SECONDS" ]
+}
+
+# stale と判定した時点の lock PID が今も残っている場合だけ剥がす。判定中に別プロセスが
+# lock を取り直していた場合に、その正常な lock を消さないため。
+steal_lock_if_stale() {
+  observed_pid=""
+  if [ -f "$LOCK_PID_FILE" ]; then
+    observed_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null)"
+  fi
+
+  lock_is_stale || return 1
+
+  current_pid=""
+  if [ -f "$LOCK_PID_FILE" ]; then
+    current_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null)"
+  fi
+  [ "$current_pid" = "$observed_pid" ] || return 1
+
+  release_lock
 }
 
 acquire_lock() {
@@ -52,8 +78,7 @@ acquire_lock() {
       return 1
     fi
 
-    if lock_is_stale; then
-      release_lock
+    if steal_lock_if_stale; then
       waited=$((waited + 1))
       continue
     fi
@@ -98,6 +123,25 @@ is_daemon_process() {
   *"$PROCESS_MATCH"*) return 0 ;;
   *) return 1 ;;
   esac
+}
+
+# nohup 直後の $! は fork 済み exec 前で、argv がまだ親の sh のままでありうる。この状態で
+# lock を解放すると、待機中の別 start が pidfile の PID を「無関係プロセス」と誤判定して
+# 二重起動する。lock を保持したまま argv が PROCESS_MATCH に一致するまで待つ。
+wait_for_daemon_ready() {
+  daemon_pid="$1"
+  waited=0
+  while :; do
+    if is_daemon_process "$daemon_pid"; then
+      return 0
+    fi
+    if ! is_process_running "$daemon_pid"; then
+      return 1
+    fi
+    [ "$waited" -lt "$READY_WAIT_SECONDS" ] || return 1
+    sleep 1
+    waited=$((waited + 1))
+  done
 }
 
 stop_daemon() {
@@ -332,5 +376,12 @@ fi
 daemon_pid=$!
 if ! printf '%s\n' "$daemon_pid" >"$PIDFILE"; then
   kill "$daemon_pid" 2>/dev/null || true
+  exit 1
+fi
+
+if ! wait_for_daemon_ready "$daemon_pid"; then
+  kill "$daemon_pid" 2>/dev/null || true
+  rm -f "$PIDFILE"
+  echo "daemon did not become ready" >&2
   exit 1
 fi
