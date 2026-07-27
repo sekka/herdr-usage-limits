@@ -2,6 +2,13 @@
 # title-daemon の起動保証 / 停止。pidfile は HERDR_PLUGIN_STATE_DIR に置く。
 STATE_DIR="${HERDR_PLUGIN_STATE_DIR:?HERDR_PLUGIN_STATE_DIR not set}"
 PIDFILE="$STATE_DIR/title-daemon.pid"
+LOCK_DIR="$STATE_DIR/title-daemon.lock"
+LOCK_PID_FILE="$LOCK_DIR/pid"
+LOCK_STALE_SECONDS="${ENSURE_TITLE_DAEMON_LOCK_STALE_SECONDS:-30}"
+LOCK_WAIT_SECONDS="${ENSURE_TITLE_DAEMON_LOCK_WAIT_SECONDS:-5}"
+STOP_WAIT_SECONDS="${ENSURE_TITLE_DAEMON_STOP_WAIT_SECONDS:-5}"
+READY_WAIT_SECONDS="${ENSURE_TITLE_DAEMON_READY_WAIT_SECONDS:-5}"
+PROCESS_MATCH="${ENSURE_TITLE_DAEMON_PROCESS_MATCH:-title-daemon.ts}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 INSTALL_STAMP="$REPO_ROOT/node_modules/.install-stamp"
@@ -10,16 +17,182 @@ INSTALL_LOCK_PID_FILE="$INSTALL_LOCK_DIR/pid"
 INSTALL_LOCK_STALE_SECONDS=120
 INSTALL_WAIT_SECONDS=30
 
-if [ "${1:-}" = "stop" ]; then
-  [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
-  rm -f "$PIDFILE"
-  exit 0
-fi
+release_lock() {
+  rm -f "$LOCK_PID_FILE" 2>/dev/null || true
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
 
-# 既に生きていれば何もしない
-if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-  exit 0
-fi
+lock_is_stale() {
+  lock_pid=""
+  if [ -f "$LOCK_PID_FILE" ]; then
+    lock_pid="$(cat "$LOCK_PID_FILE")"
+  fi
+
+  case "$lock_pid" in
+  '' | *[!0-9]*)
+    ;;
+  *)
+    kill_error="$(kill -0 "$lock_pid" 2>&1)" && return 1
+    case "$kill_error" in
+    # 別ユーザーの PID だと生死を判定できない。install lock と違い daemon lock には
+    # wait_for_dependencies のような時間切れの逃げ道が無く、ここで「生存」と即断すると
+    # 恒久的に start 不能になる。mtime 判定へ落として時間で回収する。
+    *"not permitted"*) ;;
+    *) return 0 ;;
+    esac
+    ;;
+  esac
+
+  lock_mtime="$(stat -f %m "$LOCK_DIR" 2>/dev/null)" || return 1
+  now="$(date +%s)" || return 1
+  [ $((now - lock_mtime)) -ge "$LOCK_STALE_SECONDS" ]
+}
+
+# stale と判定した時点の lock PID が今も残っている場合だけ剥がす。判定中に別プロセスが
+# lock を取り直していた場合に、その正常な lock を消さないため。
+steal_lock_if_stale() {
+  observed_pid=""
+  if [ -f "$LOCK_PID_FILE" ]; then
+    observed_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null)"
+  fi
+
+  lock_is_stale || return 1
+
+  current_pid=""
+  if [ -f "$LOCK_PID_FILE" ]; then
+    current_pid="$(cat "$LOCK_PID_FILE" 2>/dev/null)"
+  fi
+  [ "$current_pid" = "$observed_pid" ] || return 1
+
+  release_lock
+}
+
+acquire_lock() {
+  waited=0
+  while [ "$waited" -lt "$LOCK_WAIT_SECONDS" ]; do
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      if printf '%s\n' "$$" >"$LOCK_PID_FILE"; then
+        return 0
+      fi
+      release_lock
+      return 1
+    fi
+
+    if steal_lock_if_stale; then
+      waited=$((waited + 1))
+      continue
+    fi
+
+    sleep 1
+    waited=$((waited + 1))
+  done
+
+  return 1
+}
+
+read_daemon_pid() {
+  daemon_pid=""
+  if [ -f "$PIDFILE" ]; then
+    daemon_pid="$(cat "$PIDFILE")"
+  fi
+  case "$daemon_pid" in
+  '' | *[!0-9]*) return 1 ;;
+  esac
+  printf '%s\n' "$daemon_pid"
+}
+
+is_process_running() {
+  daemon_pid="$1"
+  case "$daemon_pid" in
+  '' | *[!0-9]*) return 1 ;;
+  esac
+
+  kill -0 "$daemon_pid" 2>/dev/null || return 1
+  daemon_state="$(ps -p "$daemon_pid" -o state= 2>/dev/null)" || return 1
+  case "$daemon_state" in
+  Z*) return 1 ;;
+  esac
+  return 0
+}
+
+is_daemon_process() {
+  daemon_pid="$1"
+  is_process_running "$daemon_pid" || return 1
+  daemon_command="$(ps -p "$daemon_pid" -o command= 2>/dev/null)" || return 1
+  case "$daemon_command" in
+  *"$PROCESS_MATCH"*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+# nohup 直後の $! は fork 済み exec 前で、argv がまだ親の sh のままでありうる。この状態で
+# lock を解放すると、待機中の別 start が pidfile の PID を「無関係プロセス」と誤判定して
+# 二重起動する。lock を保持したまま argv が PROCESS_MATCH に一致するまで待つ。
+wait_for_daemon_ready() {
+  daemon_pid="$1"
+  waited=0
+  while :; do
+    if is_daemon_process "$daemon_pid"; then
+      return 0
+    fi
+    if ! is_process_running "$daemon_pid"; then
+      return 1
+    fi
+    [ "$waited" -lt "$READY_WAIT_SECONDS" ] || return 1
+    sleep 1
+    waited=$((waited + 1))
+  done
+}
+
+# ready 判定に失敗した子の後始末。終了を確認せずに pidfile を消すと、次の start が
+# pidfile 不在を理由に別 daemon を起こし、多重起動ガードを failure path から破られる。
+# 自分が起こした子なので TERM 後は SIGKILL まで escalate して終了を確定させる。
+terminate_child() {
+  child_pid="$1"
+  kill "$child_pid" 2>/dev/null || true
+  if wait_for_exit "$child_pid"; then
+    return 0
+  fi
+
+  kill -KILL "$child_pid" 2>/dev/null || true
+  wait_for_exit "$child_pid"
+}
+
+wait_for_exit() {
+  exit_pid="$1"
+  waited=0
+  while [ "$waited" -lt "$STOP_WAIT_SECONDS" ]; do
+    if ! is_process_running "$exit_pid"; then
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  return 1
+}
+
+stop_daemon() {
+  daemon_pid="$(read_daemon_pid)" || {
+    rm -f "$PIDFILE"
+    return 0
+  }
+  if ! is_daemon_process "$daemon_pid"; then
+    rm -f "$PIDFILE"
+    return 0
+  fi
+
+  if ! kill "$daemon_pid" 2>/dev/null; then
+    return 1
+  fi
+
+  if wait_for_exit "$daemon_pid"; then
+    rm -f "$PIDFILE"
+    return 0
+  fi
+
+  echo "daemon did not stop" >&2
+  return 1
+}
 
 can_run_bun() {
   [ -n "$1" ] && [ -x "$1" ] && "$1" --version >/dev/null 2>&1
@@ -42,8 +215,7 @@ resolve_bun() {
     "/opt/homebrew/bin/bun" \
     "/usr/local/bin/bun" \
     "/run/current-system/sw/bin/bun" \
-    "${HOME:-}/.nix-profile/bin/bun"
-  do
+    "${HOME:-}/.nix-profile/bin/bun"; do
     if can_run_bun "$candidate"; then
       printf '%s\n' "$candidate"
       return 0
@@ -91,15 +263,15 @@ install_lock_is_stale() {
   fi
 
   case "$lock_pid" in
-    ''|*[!0-9]*)
-      ;;
-    *)
-      kill_error="$(kill -0 "$lock_pid" 2>&1)" && return 1
-      case "$kill_error" in
-        *"Operation not permitted"*|*"not permitted"*) return 1 ;;
-        *) return 0 ;;
-      esac
-      ;;
+  '' | *[!0-9]*)
+    ;;
+  *)
+    kill_error="$(kill -0 "$lock_pid" 2>&1)" && return 1
+    case "$kill_error" in
+    *"Operation not permitted"* | *"not permitted"*) return 1 ;;
+    *) return 0 ;;
+    esac
+    ;;
   esac
 
   lock_mtime="$(stat -f %m "$INSTALL_LOCK_DIR" 2>/dev/null)" || return 1
@@ -126,6 +298,20 @@ acquire_install_lock() {
       return 0
     fi
   fi
+
+  return 1
+}
+
+wait_for_dependencies() {
+  expected="$1"
+  waited=0
+  while [ "$waited" -lt "$INSTALL_WAIT_SECONDS" ]; do
+    sleep 1
+    waited=$((waited + 1))
+    if dependencies_are_current "$expected"; then
+      return 0
+    fi
+  done
 
   return 1
 }
@@ -163,25 +349,64 @@ ensure_dependencies() {
   return 1
 }
 
-wait_for_dependencies() {
-  expected="$1"
-  waited=0
-  while [ "$waited" -lt "$INSTALL_WAIT_SECONDS" ]; do
-    sleep 1
-    waited=$((waited + 1))
-    if dependencies_are_current "$expected"; then
-      return 0
-    fi
-  done
+if [ "${1:-}" = "stop" ]; then
+  if ! acquire_lock; then
+    echo "daemon lock unavailable" >&2
+    exit 1
+  fi
+  trap 'release_lock' 0 1 2 15
+  stop_daemon
+  exit $?
+fi
 
-  return 1
-}
+# 既に生きていれば何もしない (ロック取得前の高速パス。権威ある判定はロック内で再度行う)
+daemon_pid="$(read_daemon_pid)" || daemon_pid=""
+if is_daemon_process "$daemon_pid"; then
+  exit 0
+fi
 
-BUN="$(resolve_bun)" || exit 1
-if ! ensure_dependencies; then
-  echo "usage-limits dependency install failed" >&2
+# 依存インストールは daemon ロックの外で行う。install lock 側で既に直列化されており、
+# 冷えたインストールは LOCK_WAIT_SECONDS を超えるため、daemon ロック内に置くと
+# 同時起動のもう一方が「daemon lock unavailable」で失敗する。
+if [ -z "${ENSURE_TITLE_DAEMON_TEST_CMD:-}" ]; then
+  BUN="$(resolve_bun)" || exit 1
+  if ! ensure_dependencies; then
+    echo "usage-limits dependency install failed" >&2
+    exit 1
+  fi
+fi
+
+if ! acquire_lock; then
+  echo "daemon lock unavailable" >&2
+  exit 1
+fi
+trap 'release_lock' 0 1 2 15
+
+daemon_pid="$(read_daemon_pid)" || daemon_pid=""
+if is_daemon_process "$daemon_pid"; then
+  exit 0
+fi
+rm -f "$PIDFILE"
+
+# ENSURE_TITLE_DAEMON_TEST_CMD はテスト専用の起動対象差し替え (引数なしの実行ファイル1つ)。
+# bun test 以外で設定しないこと。設定時は ENSURE_TITLE_DAEMON_PROCESS_MATCH も対象に合わせること
+if [ -n "${ENSURE_TITLE_DAEMON_TEST_CMD:-}" ]; then
+  nohup "$ENSURE_TITLE_DAEMON_TEST_CMD" >/dev/null 2>&1 &
+else
+  nohup "$BUN" "$REPO_ROOT/src/title-daemon.ts" >/dev/null 2>&1 &
+fi
+daemon_pid=$!
+if ! printf '%s\n' "$daemon_pid" >"$PIDFILE"; then
+  kill "$daemon_pid" 2>/dev/null || true
   exit 1
 fi
 
-nohup "$BUN" "$REPO_ROOT/src/title-daemon.ts" >/dev/null 2>&1 &
-echo $! >"$PIDFILE"
+if ! wait_for_daemon_ready "$daemon_pid"; then
+  if ! terminate_child "$daemon_pid"; then
+    echo "daemon did not become ready and could not be terminated" >&2
+    exit 1
+  fi
+  rm -f "$PIDFILE"
+  echo "daemon did not become ready" >&2
+  exit 1
+fi

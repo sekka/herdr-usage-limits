@@ -1,9 +1,10 @@
 ---
 id: TASK-7
 title: ensure-title-daemon.sh の起動/停止ガードを堅牢化する
-status: To Do
+status: Done
 assignee: []
-created_date: "2026-07-22 12:10"
+created_date: '2026-07-22 12:10'
+updated_date: '2026-07-27 05:41'
 labels:
   - tech-debt
 dependencies: []
@@ -33,12 +34,9 @@ herdr-tab-title の scripts/ensure-daemon.sh (commit 356b29a) と scripts/ensure
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
-
 <!-- AC:BEGIN -->
-
-- [ ] #1 tab-title 側の修正を現行コードへ移植し (プロセス同定は title-daemon.ts)、依存インストールロックとの整合を確認した
-- [ ] #2 bun test (ensure-title-daemon 対象のテストファイル) で次の 4 ケースが pass: 並行 start で単一起動 / pidfile の無関係 PID をデーモンと誤認しない / stop は終了確認後に pidfile 削除 / TERM 無視デーモンで stop が非ゼロ終了し pidfile 保持
-- [ ] #3 実機で start/stop 動作が pass
-- [ ] #4 ローカルレビューゲート通過
-
+- [x] #1 tab-title 側の修正を現行コードへ移植し (プロセス同定は title-daemon.ts)、依存インストールロックとの整合を確認した
+- [x] #2 bun test (ensure-title-daemon 対象のテストファイル) で次の 4 ケースが pass: 並行 start で単一起動 / pidfile の無関係 PID をデーモンと誤認しない / stop は終了確認後に pidfile 削除 / TERM 無視デーモンで stop が非ゼロ終了し pidfile 保持
+- [x] #3 実機で start/stop 動作が pass
+- [x] #4 ローカルレビューゲート通過
 <!-- AC:END -->
