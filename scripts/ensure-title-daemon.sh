@@ -26,16 +26,33 @@ can_run_bun() {
 }
 
 resolve_bun() {
-  # herdr の GUI 起動だと mise shims が PATH に無いことがあるため bun を明示解決する
-  preferred="$HOME/.local/share/mise/shims/bun"
-  if can_run_bun "$preferred"; then
-    printf '%s\n' "$preferred"
-    return 0
+  # Herdr plugin commands can run with a minimal PATH, so probe common installer
+  # locations before falling back to PATH.
+  if [ -n "${BUN_INSTALL:-}" ]; then
+    candidate="$BUN_INSTALL/bin/bun"
+    if can_run_bun "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
   fi
 
-  fallback="$(command -v bun 2>/dev/null || true)"
-  if [ "$fallback" != "$preferred" ] && can_run_bun "$fallback"; then
-    printf '%s\n' "$fallback"
+  for candidate in \
+    "${HOME:-}/.bun/bin/bun" \
+    "${HOME:-}/.local/share/mise/shims/bun" \
+    "/opt/homebrew/bin/bun" \
+    "/usr/local/bin/bun" \
+    "/run/current-system/sw/bin/bun" \
+    "${HOME:-}/.nix-profile/bin/bun"
+  do
+    if can_run_bun "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  candidate="$(command -v bun 2>/dev/null || true)"
+  if can_run_bun "$candidate"; then
+    printf '%s\n' "$candidate"
     return 0
   fi
 
