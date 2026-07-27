@@ -1,10 +1,10 @@
 ---
 id: TASK-9
 title: CLAUDE.md のレビューゲートが存在しない coderabbit フラグを指定していて偽陰性を返す
-status: To Do
+status: Done
 assignee: []
-created_date: '2026-07-27 08:04'
-updated_date: '2026-07-27 08:04'
+created_date: "2026-07-27 08:04"
+updated_date: "2026-07-27 23:20"
 labels: []
 dependencies: []
 priority: high
@@ -14,6 +14,7 @@ ordinal: 9000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+
 ## 事象 (2026-07-27)
 
 CLAUDE.md の "Definition of done — local review gate" が指定するコマンド
@@ -68,9 +69,24 @@ CLAUDE.md のゲート記述を実在するフラグに直す。
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
+
 横展開の実測 (2026-07-27): 同じ記述を持つのは3リポ。
+
 - /Users/kei/src/github.com/sekka/herdr-usage-limits/CLAUDE.md:14
 - /Users/kei/src/github.com/sekka/herdr-tab-title/CLAUDE.md:14
 - /Users/kei/src/github.com/sekka/tmux-usage-limits/CLAUDE.md:14
-いずれも同一文面。3つとも直すこと。
+  いずれも同一文面。3つとも直すこと。
+
+### 完了 (2026-07-28)
+
+3リポとも同一文面に修正済み (`md5 -q CLAUDE.md` = `78b1ba4ebbacdbd75513e7984f1668e4`)。
+
+ローカルレビューゲート通過:
+
+- CodeRabbit — minor 1件 (再現手段の無い一般主張)。再現コマンドを添えて対応。
+- codex peer — 1回目 BLOCK。「flags get renamed between CLI releases」は今回の probe から
+  再現できない断定という指摘。該当文を削除し実測範囲まで縮めて 2回目 PASS。
+
+確定した事実は「CLI 0.7.0 で `--type` は受理されるが `--help` に出ない」のみ。
+`coderabbit review --type bogus` が valid types を印字することが再現手順。
 <!-- SECTION:NOTES:END -->
