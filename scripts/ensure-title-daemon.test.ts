@@ -105,7 +105,7 @@ describe("ensure-title-daemon.sh", () => {
     expect(await first.exited).toBe(0);
     expect(await second.exited).toBe(0);
     const pid = trackedPid(f.stateDir);
-    await waitUntil(() => existsSync(f.starts));
+    await waitUntil(() => existsSync(f.starts) && readFileSync(f.starts, "utf8").trim().length > 0);
 
     expect(readFileSync(f.starts, "utf8").trim().split("\n")).toHaveLength(1);
     expect(processIsAlive(pid)).toBe(true);
