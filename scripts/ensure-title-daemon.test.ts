@@ -216,6 +216,70 @@ printf '%s\\n' "$?" >"$STATUS_FILE"
     expect(existsSync(lockDir)).toBe(true);
   });
 
+  test("install lock は未知の kill 診断でも生存 PID を stale にしない", () => {
+    const f = fixture();
+    const installLockDir = join(f.stateDir, "install-lock");
+    mkdirSync(installLockDir);
+    writeFileSync(join(installLockDir, "pid"), "1\n");
+    const statusFile = join(f.stateDir, "install-stale-status");
+    const harness = `${shellFunctions()}
+INSTALL_LOCK_DIR="$TEST_INSTALL_LOCK_DIR"
+INSTALL_LOCK_PID_FILE="$INSTALL_LOCK_DIR/pid"
+kill() {
+  echo 'unknown diagnostic' >&2
+  return 1
+}
+install_lock_is_stale
+printf '%s\\n' "$?" >"$STATUS_FILE"
+`;
+
+    const result = Bun.spawnSync(["/bin/sh"], {
+      env: {
+        ...f.env,
+        STATUS_FILE: statusFile,
+        TEST_INSTALL_LOCK_DIR: installLockDir,
+      },
+      stdin: new TextEncoder().encode(harness),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(readFileSync(statusFile, "utf8").trim()).toBe("1");
+    expect(existsSync(installLockDir)).toBe(true);
+  });
+
+  test("install lock は死んだ PID の期限切れ lock を stale にする", () => {
+    const f = fixture();
+    const installLockDir = join(f.stateDir, "install-lock");
+    mkdirSync(installLockDir);
+    writeFileSync(join(installLockDir, "pid"), "999999\n");
+    const old = new Date(Date.now() - 180_000);
+    utimesSync(installLockDir, old, old);
+    const statusFile = join(f.stateDir, "install-stale-status");
+    const harness = `${shellFunctions()}
+INSTALL_LOCK_DIR="$TEST_INSTALL_LOCK_DIR"
+INSTALL_LOCK_PID_FILE="$INSTALL_LOCK_DIR/pid"
+INSTALL_LOCK_STALE_SECONDS=1
+install_lock_is_stale
+printf '%s\\n' "$?" >"$STATUS_FILE"
+`;
+
+    const result = Bun.spawnSync(["/bin/sh"], {
+      env: {
+        ...f.env,
+        STATUS_FILE: statusFile,
+        TEST_INSTALL_LOCK_DIR: installLockDir,
+      },
+      stdin: new TextEncoder().encode(harness),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(readFileSync(statusFile, "utf8").trim()).toBe("0");
+  });
+
   test("死んだ PID の期限切れ lock を奪取して daemon を起動する", async () => {
     const f = fixture();
     staleDaemonLock(f);
