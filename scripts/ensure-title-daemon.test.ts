@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,10 +48,19 @@ function fixture(options: { ignoreTerm?: boolean } = {}) {
       HERDR_PLUGIN_STATE_DIR: stateDir,
       ENSURE_TITLE_DAEMON_TEST_CMD: command,
       ENSURE_TITLE_DAEMON_STOP_WAIT_SECONDS: "1",
-      ENSURE_TITLE_DAEMON_PROCESS_MATCH: "perl",
+      ENSURE_TITLE_DAEMON_PROCESS_MATCH: "title-daemon.ts",
       STARTS_FILE: starts,
     },
   };
+}
+
+function staleDaemonLock(f: ReturnType<typeof fixture>) {
+  const lockDir = join(f.stateDir, "title-daemon.lock");
+  mkdirSync(lockDir);
+  writeFileSync(join(lockDir, "pid"), "999999\n");
+  const old = new Date(Date.now() - 60_000);
+  utimesSync(lockDir, old, old);
+  return lockDir;
 }
 
 function run(env: Record<string, string | undefined>, action?: "stop") {
@@ -60,6 +69,14 @@ function run(env: Record<string, string | undefined>, action?: "stop") {
     stdout: "pipe",
     stderr: "pipe",
   });
+}
+
+function shellFunctions(): string {
+  const script = readFileSync(ensureDaemon, "utf8");
+  const mainStart = "\nif [ \"${1:-}\" = \"stop\" ]; then";
+  const index = script.indexOf(mainStart);
+  if (index === -1) throw new Error("ensure-title-daemon main section not found");
+  return script.slice(0, index);
 }
 
 function trackedPid(stateDir: string): number {
@@ -159,5 +176,57 @@ describe("ensure-title-daemon.sh", () => {
     processes.add(pid);
     expect(processIsAlive(pid)).toBe(false);
     expect(existsSync(join(f.stateDir, "title-daemon.pid"))).toBe(false);
+  });
+
+  test("未知の kill 診断では生存 lock を奪取しない", () => {
+    const f = fixture();
+    const lockDir = join(f.stateDir, "title-daemon.lock");
+    mkdirSync(lockDir);
+    writeFileSync(join(lockDir, "pid"), "1\n");
+    const releaseMarker = join(f.stateDir, "released");
+    const statusFile = join(f.stateDir, "steal-status");
+    const harness = `${shellFunctions()}
+kill() {
+  echo 'unknown diagnostic' >&2
+  return 1
+}
+release_lock() {
+  printf 'released\\n' >"$RELEASE_MARKER"
+  rm -f "$LOCK_PID_FILE" 2>/dev/null || true
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+steal_lock_if_stale
+printf '%s\\n' "$?" >"$STATUS_FILE"
+`;
+
+    const result = Bun.spawnSync(["/bin/sh"], {
+      env: {
+        ...f.env,
+        RELEASE_MARKER: releaseMarker,
+        STATUS_FILE: statusFile,
+      },
+      stdin: new TextEncoder().encode(harness),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(readFileSync(statusFile, "utf8").trim()).toBe("1");
+    expect(existsSync(releaseMarker)).toBe(false);
+    expect(existsSync(lockDir)).toBe(true);
+  });
+
+  test("死んだ PID の期限切れ lock を奪取して daemon を起動する", async () => {
+    const f = fixture();
+    staleDaemonLock(f);
+
+    expect(run({ ...f.env, ENSURE_TITLE_DAEMON_LOCK_STALE_SECONDS: "1" }).exitCode).toBe(0);
+    const daemonPid = trackedPid(f.stateDir);
+    await waitUntil(() => existsSync(f.starts));
+
+    expect(readFileSync(f.starts, "utf8").trim().split("\n")).toHaveLength(1);
+    expect(daemonPid).not.toBe(999999);
+    expect(processIsAlive(daemonPid)).toBe(true);
+    expect(existsSync(join(f.stateDir, "title-daemon.lock"))).toBe(false);
   });
 });
