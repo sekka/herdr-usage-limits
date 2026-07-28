@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.3](https://github.com/sekka/herdr-usage-limits/compare/v1.2.2...v1.2.3) (2026-07-27)
+
+
+### Bug Fixes
+
+* daemon ロックの stale 判定と起動完了確認を厳格化する ([0c072ca](https://github.com/sekka/herdr-usage-limits/commit/0c072ca7e6cd01d8d5723671fad10d922417b427))
+* ensure-title-daemon.sh の起動/停止ガードを堅牢化する ([0ecc9af](https://github.com/sekka/herdr-usage-limits/commit/0ecc9af60e9aab728cb09505a42ac6b526159edd))
+* ready 判定失敗時に子の終了を確認してから pidfile を削除する ([49b579e](https://github.com/sekka/herdr-usage-limits/commit/49b579e671b2b42f91ba24701cd3877e07c79de5))
+
 ## [1.2.2](https://github.com/sekka/herdr-usage-limits/compare/v1.2.1...v1.2.2) (2026-07-27)
 
 
