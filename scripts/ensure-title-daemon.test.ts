@@ -286,7 +286,7 @@ printf '%s\\n' "$?" >"$STATUS_FILE"
 
     expect(run({ ...f.env, ENSURE_TITLE_DAEMON_LOCK_STALE_SECONDS: "1" }).exitCode).toBe(0);
     const daemonPid = trackedPid(f.stateDir);
-    await waitUntil(() => existsSync(f.starts));
+    await waitUntil(() => existsSync(f.starts) && readFileSync(f.starts, "utf8").trim().length > 0);
 
     expect(readFileSync(f.starts, "utf8").trim().split("\n")).toHaveLength(1);
     expect(daemonPid).not.toBe(999999);
