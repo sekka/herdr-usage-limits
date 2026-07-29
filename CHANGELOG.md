@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.4](https://github.com/sekka/herdr-usage-limits/compare/v1.2.3...v1.2.4) (2026-07-29)
+
+
+### Bug Fixes
+
+* install lock の EPERM 判定から冗長な case パターンを除く ([b232773](https://github.com/sekka/herdr-usage-limits/commit/b2327735ae020fb1abf5b5e2ad96d8c1633e3dff))
+* lock の EPERM 判定を LC_ALL=C でロケール非依存にする ([8801e8e](https://github.com/sekka/herdr-usage-limits/commit/8801e8e1f8ae79c943c2a6aa94e81117b5598820))
+* lock 生死判定を ps に置き換える ([29f76d7](https://github.com/sekka/herdr-usage-limits/commit/29f76d7597148060d7772a1f3bb4191a20ce0e75))
+
 ## [1.2.3](https://github.com/sekka/herdr-usage-limits/compare/v1.2.2...v1.2.3) (2026-07-27)
 
 
