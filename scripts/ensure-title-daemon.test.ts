@@ -36,6 +36,12 @@ async function exitedPid(): Promise<number> {
   return pid;
 }
 
+function livePid(): number {
+  const child = Bun.spawn(["/bin/sleep", "30"]);
+  processes.add(child.pid);
+  return child.pid;
+}
+
 function fixture(options: { ignoreTerm?: boolean } = {}) {
   const stateDir = mkdtempSync(join(tmpdir(), "ensure-title-daemon-test-"));
   directories.add(stateDir);
@@ -227,6 +233,46 @@ printf '%s\\n' "$?" >"$STATUS_FILE"
     expect(existsSync(lockDir)).toBe(true);
   });
 
+  test("生存 PID の期限切れ lock は奪取しない", () => {
+    const f = fixture();
+    const lockDir = join(f.stateDir, "title-daemon.lock");
+    mkdirSync(lockDir);
+    const pid = livePid();
+    writeFileSync(join(lockDir, "pid"), `${pid}\n`);
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(lockDir, old, old);
+    const releaseMarker = join(f.stateDir, "released");
+    const statusFile = join(f.stateDir, "steal-status");
+    const harness = `${shellFunctions()}
+release_lock() {
+  printf 'released\\n' >"$RELEASE_MARKER"
+  rm -f "$LOCK_PID_FILE" 2>/dev/null || true
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+steal_lock_if_stale
+printf '%s\\n' "$?" >"$STATUS_FILE"
+`;
+
+    const result = Bun.spawnSync(["/bin/sh"], {
+      env: {
+        ...f.env,
+        ENSURE_TITLE_DAEMON_LOCK_STALE_SECONDS: "1",
+        RELEASE_MARKER: releaseMarker,
+        STATUS_FILE: statusFile,
+      },
+      stdin: new TextEncoder().encode(harness),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(readFileSync(statusFile, "utf8").trim()).toBe("1");
+    expect(existsSync(releaseMarker)).toBe(false);
+    expect(existsSync(lockDir)).toBe(true);
+    expect(readFileSync(join(lockDir, "pid"), "utf8").trim()).toBe(`${pid}`);
+    expect(processIsAlive(pid)).toBe(true);
+  });
+
   test("install lock の kill 診断文字列判定再導入で stale 扱いする回帰を防ぐ", async () => {
     const f = fixture();
     const installLockDir = join(f.stateDir, "install-lock");
@@ -260,6 +306,41 @@ printf '%s\\n' "$?" >"$STATUS_FILE"
     expect(result.exitCode).toBe(0);
     expect(readFileSync(statusFile, "utf8").trim()).toBe("1");
     expect(existsSync(installLockDir)).toBe(true);
+  });
+
+  test("install lock は生存 PID なら期限切れ mtime でも stale にしない", () => {
+    const f = fixture();
+    const installLockDir = join(f.stateDir, "install-lock");
+    mkdirSync(installLockDir);
+    const pid = livePid();
+    writeFileSync(join(installLockDir, "pid"), `${pid}\n`);
+    const old = new Date(Date.now() - 180_000);
+    utimesSync(installLockDir, old, old);
+    const statusFile = join(f.stateDir, "install-stale-status");
+    const harness = `${shellFunctions()}
+INSTALL_LOCK_DIR="$TEST_INSTALL_LOCK_DIR"
+INSTALL_LOCK_PID_FILE="$INSTALL_LOCK_DIR/pid"
+INSTALL_LOCK_STALE_SECONDS=1
+install_lock_is_stale
+printf '%s\\n' "$?" >"$STATUS_FILE"
+`;
+
+    const result = Bun.spawnSync(["/bin/sh"], {
+      env: {
+        ...f.env,
+        STATUS_FILE: statusFile,
+        TEST_INSTALL_LOCK_DIR: installLockDir,
+      },
+      stdin: new TextEncoder().encode(harness),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(readFileSync(statusFile, "utf8").trim()).toBe("1");
+    expect(existsSync(installLockDir)).toBe(true);
+    expect(readFileSync(join(installLockDir, "pid"), "utf8").trim()).toBe(`${pid}`);
+    expect(processIsAlive(pid)).toBe(true);
   });
 
   test("install lock は死んだ PID の期限切れ lock を stale にする", async () => {
