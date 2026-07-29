@@ -32,14 +32,7 @@ lock_is_stale() {
   '' | *[!0-9]*)
     ;;
   *)
-    kill_error="$(LC_ALL=C kill -0 "$lock_pid" 2>&1)" && return 1
-    case "$kill_error" in
-    # 別ユーザーの PID だと生死を判定できない。install lock と違い daemon lock には
-    # wait_for_dependencies のような時間切れの逃げ道が無く、ここで「生存」と即断すると
-    # 恒久的に start 不能になる。mtime 判定へ落として時間で回収する。
-    *"not permitted"*) ;;
-    *) return 0 ;;
-    esac
+    ps -p "$lock_pid" >/dev/null 2>&1 && return 1
     ;;
   esac
 
@@ -266,11 +259,7 @@ install_lock_is_stale() {
   '' | *[!0-9]*)
     ;;
   *)
-    kill_error="$(LC_ALL=C kill -0 "$lock_pid" 2>&1)" && return 1
-    case "$kill_error" in
-    *"not permitted"*) return 1 ;;
-    *) return 0 ;;
-    esac
+    ps -p "$lock_pid" >/dev/null 2>&1 && return 1
     ;;
   esac
 
