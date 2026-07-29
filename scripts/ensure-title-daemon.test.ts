@@ -187,13 +187,15 @@ describe("ensure-title-daemon.sh", () => {
     expect(existsSync(join(f.stateDir, "title-daemon.pid"))).toBe(false);
   });
 
-  test("未知の kill 診断では生存 lock を奪取しない", async () => {
+  test("kill 診断文字列判定を再導入すると lock を奪取する回帰を防ぐ", async () => {
     const f = fixture();
     const lockDir = join(f.stateDir, "title-daemon.lock");
     mkdirSync(lockDir);
     writeFileSync(join(lockDir, "pid"), `${await exitedPid()}\n`);
     const releaseMarker = join(f.stateDir, "released");
     const statusFile = join(f.stateDir, "steal-status");
+    // 現行実装は kill を呼ばない。kill 診断文字列で判定する実装に戻ると、
+    // この stub の unknown diagnostic 経由で lock を奪取してしまうことを検出する。
     const harness = `${shellFunctions()}
 kill() {
   echo 'unknown diagnostic' >&2
@@ -225,12 +227,14 @@ printf '%s\\n' "$?" >"$STATUS_FILE"
     expect(existsSync(lockDir)).toBe(true);
   });
 
-  test("install lock は未知の kill 診断でも生存 PID を stale にしない", async () => {
+  test("install lock の kill 診断文字列判定再導入で stale 扱いする回帰を防ぐ", async () => {
     const f = fixture();
     const installLockDir = join(f.stateDir, "install-lock");
     mkdirSync(installLockDir);
     writeFileSync(join(installLockDir, "pid"), `${await exitedPid()}\n`);
     const statusFile = join(f.stateDir, "install-stale-status");
+    // 現行実装は kill を呼ばない。kill 診断文字列で判定する実装に戻ると、
+    // この stub の unknown diagnostic 経由で install lock を stale 扱いしてしまう。
     const harness = `${shellFunctions()}
 INSTALL_LOCK_DIR="$TEST_INSTALL_LOCK_DIR"
 INSTALL_LOCK_PID_FILE="$INSTALL_LOCK_DIR/pid"
