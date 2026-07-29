@@ -297,8 +297,9 @@ printf '%s\\n' "$?" >"$STATUS_FILE"
     const daemonPid = trackedPid(f.stateDir);
     await waitUntil(() => existsSync(f.starts) && readFileSync(f.starts, "utf8").trim().length > 0);
 
-    expect(readFileSync(f.starts, "utf8").trim().split("\n")).toHaveLength(1);
-    expect(daemonPid).not.toBe(staleLock.pid);
+    const starts = readFileSync(f.starts, "utf8").trim().split("\n");
+    expect(starts).toEqual([`${daemonPid}`]);
+    expect(Number.isInteger(staleLock.pid)).toBe(true);
     expect(processIsAlive(daemonPid)).toBe(true);
     expect(existsSync(join(f.stateDir, "title-daemon.lock"))).toBe(false);
   });
